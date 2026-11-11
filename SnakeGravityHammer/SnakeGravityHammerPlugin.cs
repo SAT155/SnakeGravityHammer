@@ -24,7 +24,7 @@ namespace SnakeGravityHammer
     {
         public const string PluginGuid = "com.snakesquad.snakegravityhammer";
         public const string PluginName = "SnakeGravityHammer";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.3.1";
 
         internal static SnakeGravityHammerPlugin? Instance;
 
@@ -165,37 +165,34 @@ namespace SnakeGravityHammer
                 return;
             }
 
-            if (!SnakeGravityHammerPlugin.Active())
-            {
-                _lastGhost = null;
-                return;
-            }
-
-            var piece = ghost.GetComponent<Piece>();
-            if (piece == null || !Suitable(piece, ghost))
-                return;
-
             var t = ghost.transform;
             if (_lastGhost == ghost && t.position == _setPos && t.rotation == _setRot)
             {
-                // Untouched since our last change: rebuild from the pose before it.
+                // Untouched since our last change (some building modes and the frame after placing
+                // don't reset the ghost): start again from the pose before our tilt.
+                t.position = _basePos;
+                t.rotation = _baseRot;
             }
             else
             {
                 _basePos = t.position;
                 _baseRot = t.rotation;
             }
-            _lastGhost = ghost;
+            // From here the ghost is at its untilted pose; anything that returns early leaves it so.
+            _lastGhost = null;
+
+            if (!SnakeGravityHammerPlugin.Active())
+                return;
+
+            var piece = ghost.GetComponent<Piece>();
+            if (piece == null || !Suitable(piece, ghost))
+                return;
 
             // Snapped onto another piece's snap point: the snap decides the pose, so stand aside.
-            t.position = _basePos;
-            t.rotation = _baseRot;
             if (IsSnapped(ghost))
-            {
-                _lastGhost = null;
                 return;
-            }
 
+            _lastGhost = ghost;
             try
             {
                 if (Settle(ghost, out var pos, out var rot))
