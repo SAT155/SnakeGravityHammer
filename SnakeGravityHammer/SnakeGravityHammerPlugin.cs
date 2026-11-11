@@ -24,7 +24,7 @@ namespace SnakeGravityHammer
     {
         public const string PluginGuid = "com.snakesquad.snakegravityhammer";
         public const string PluginName = "SnakeGravityHammer";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.3.0";
 
         internal static SnakeGravityHammerPlugin? Instance;
 
@@ -36,6 +36,7 @@ namespace SnakeGravityHammer
         internal static ConfigEntry<int> Samples = null!;
         internal static ConfigEntry<bool> RestOnPieces = null!;
         internal static ConfigEntry<FitMode> Fit = null!;
+        internal static ConfigEntry<float> MaxStepUp = null!;
         internal static ConfigEntry<bool> LogFit = null!;
 
         private static bool _toggledOn;
@@ -73,6 +74,12 @@ namespace SnakeGravityHammer
                 "it rests on the ground points that hold it up (it can rock onto a bump rather than follow " +
                 "the average slope). Average: tilt to the average slope under the piece, then rest on the " +
                 "highest point.");
+            MaxStepUp = Config.Bind("2 - Settling", "Max Step Up", 0.5f,
+                new ConfigDescription(
+                    "How far (in metres) above where the game itself would put the piece it may rise to rest " +
+                    "on something. Stops the top of a neighbouring piece next to it from lifting it into the " +
+                    "air. To stack onto a piece, aim the cursor at that piece.",
+                    new AcceptableValueRange<float>(0f, 3f)));
             RestOnPieces = Config.Bind("2 - Settling", "Rest On Pieces", true,
                 "Pieces can rest on other built pieces, not just terrain and rocks.");
 
@@ -280,6 +287,8 @@ namespace SnakeGravityHammer
             var size = b.size;
             int n = SnakeGravityHammerPlugin.Samples.Value;
             float reach = Mathf.Max(size.x, size.y, size.z) + 3f;
+            float stepUp = SnakeGravityHammerPlugin.MaxStepUp.Value;
+            float baseBottom = (_basePos + _baseRot * b.center).y - Mathf.Abs((_baseRot * new Vector3(0f, b.extents.y, 0f)).y);
 
             // Sample a grid over the base of the piece, cast rays straight down, and collect the
             // ground heights in the piece's yaw frame (x right, z forward, y up from its pivot).
@@ -293,11 +302,16 @@ namespace SnakeGravityHammer
                 for (int j = 0; j < n; j++)
                 {
                     float fz = n == 1 ? 0.5f : j / (float)(n - 1);
-                    var local = new Vector3(Mathf.Lerp(b.min.x, b.max.x, fx), b.min.y, Mathf.Lerp(b.min.z, b.max.z, fz));
+                    // Inset slightly so a neighbour merely touching the edge doesn't count as underneath.
+                    float fxi = Mathf.Lerp(0.05f, 0.95f, fx);
+                    float fzi = Mathf.Lerp(0.05f, 0.95f, fz);
+                    var local = new Vector3(Mathf.Lerp(b.min.x, b.max.x, fxi), b.min.y, Mathf.Lerp(b.min.z, b.max.z, fzi));
                     SampleLocal.Add(local);
                     var world = _basePos + yaw * new Vector3(local.x, 0f, local.z);
-                    var from = new Vector3(world.x, _basePos.y + b.max.y + reach, world.z);
-                    if (CastDown(from, reach * 2f + size.y, mask, ghost.transform, out var hitPoint))
+                    // Start just above where the game put the base: surfaces higher than that (a
+                    // neighbour's top) are ignored; a ray starting inside a collider doesn't hit it.
+                    var from = new Vector3(world.x, baseBottom + stepUp, world.z);
+                    if (CastDown(from, stepUp + reach, mask, ghost.transform, out var hitPoint))
                     {
                         var rel = inv * (hitPoint - _basePos);
                         HitLocal.Add(new Vector3(local.x, rel.y, local.z));
