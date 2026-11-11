@@ -12,6 +12,8 @@ in hides the little gaps under a piece on uneven ground. Let go of the key for n
 - Works on terrain, rocks and other built pieces.
 - Keeps the direction you turned the piece to; only the tilt and height change.
 - The placed piece is saved with its tilt, so everyone sees it, with or without the mod.
+- When a piece snaps onto another piece's snap points, the snap wins and the piece stays as
+  snapped, so walls and floors still line up.
 - Hoe and cultivator tools are left alone.
 - Plays nicely with other building mods (for example Valheim Plus's building grid): it starts
   from wherever they put the preview.

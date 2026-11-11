@@ -24,7 +24,7 @@ namespace SnakeGravityHammer
     {
         public const string PluginGuid = "com.snakesquad.snakegravityhammer";
         public const string PluginName = "SnakeGravityHammer";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
         internal static SnakeGravityHammerPlugin? Instance;
 
@@ -180,6 +180,15 @@ namespace SnakeGravityHammer
             }
             _lastGhost = ghost;
 
+            // Snapped onto another piece's snap point: the snap decides the pose, so stand aside.
+            t.position = _basePos;
+            t.rotation = _baseRot;
+            if (IsSnapped(ghost))
+            {
+                _lastGhost = null;
+                return;
+            }
+
             try
             {
                 if (Settle(ghost, out var pos, out var rot))
@@ -201,6 +210,39 @@ namespace SnakeGravityHammer
             }
             _setPos = t.position;
             _setRot = t.rotation;
+        }
+
+        private static readonly List<Transform> GhostSnaps = new List<Transform>();
+        private static readonly List<Transform> OtherSnaps = new List<Transform>();
+        private static readonly List<Piece> NearPieces = new List<Piece>();
+
+        /// <summary>True when one of the ghost's snap points sits on a snap point of a placed piece.</summary>
+        private static bool IsSnapped(GameObject ghost)
+        {
+            GhostSnaps.Clear();
+            foreach (var tr in ghost.GetComponentsInChildren<Transform>())
+                if (tr.CompareTag("snappoint"))
+                    GhostSnaps.Add(tr);
+            if (GhostSnaps.Count == 0)
+                return false;
+
+            float radius = 1f;
+            foreach (var sp in GhostSnaps)
+                radius = Mathf.Max(radius, Vector3.Distance(sp.position, ghost.transform.position) + 1f);
+            NearPieces.Clear();
+            Piece.GetAllPiecesInRadius(ghost.transform.position, radius, NearPieces);
+            foreach (var other in NearPieces)
+            {
+                if (other == null || other.gameObject == ghost || other.transform.IsChildOf(ghost.transform))
+                    continue;
+                OtherSnaps.Clear();
+                other.GetSnapPoints(OtherSnaps);
+                foreach (var b in OtherSnaps)
+                foreach (var a in GhostSnaps)
+                    if ((a.position - b.position).sqrMagnitude < 0.0004f) // within 2 cm
+                        return true;
+            }
+            return false;
         }
 
         private static bool Suitable(Piece piece, GameObject ghost)
