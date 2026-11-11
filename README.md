@@ -18,3 +18,7 @@ point minus *Sink Depth*. Placing uses the ghost's transform, so the piece lands
 CI (`.github/workflows/build.yml`) downloads the Valheim dedicated server and BepInExPack, builds,
 packages a Thunderstore zip and releases `v<MAJOR.MINOR>.<run>` on every default-branch push that
 changes the mod. Locally, `dotnet build` finds a Steam install of Valheim.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
