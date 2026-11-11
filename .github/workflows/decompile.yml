@@ -1,0 +1,71 @@
+name: Decompile
+
+# Dev aid: prints the decompiled source of Valheim types named in TYPES to the job log,
+# so patches can be written against the current game code without a local install.
+
+on:
+  workflow_dispatch:
+    inputs:
+      types:
+        description: Space-separated Valheim type names to decompile
+        default: Player
+      grep:
+        description: Optional regex; print only matching lines (plus AFTER lines after each)
+        default: ''
+      after:
+        description: Lines to print after each grep match
+        default: '60'
+
+env:
+  TYPES: ${{ inputs.types }}
+  GREP: ${{ inputs.grep }}
+  AFTER: ${{ inputs.after }}
+  # ilspycmd targets .NET 6, which the runner image no longer ships.
+  DOTNET_ROLL_FORWARD: Major
+
+permissions:
+  contents: read
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download Valheim dedicated server (for game assemblies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lib32gcc-s1
+          mkdir -p "$RUNNER_TEMP/steamcmd"
+          curl --fail --location --retry 3 \
+            https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+            -o "$RUNNER_TEMP/steamcmd.tar.gz"
+          tar -xzf "$RUNNER_TEMP/steamcmd.tar.gz" -C "$RUNNER_TEMP/steamcmd"
+          for attempt in 1 2 3; do
+            # steamcmd occasionally hangs instead of failing, so each attempt is capped.
+            if timeout 300 "$RUNNER_TEMP/steamcmd/steamcmd.sh" \
+              +force_install_dir "$RUNNER_TEMP/valheim" \
+              +login anonymous +app_update 896660 validate +quit \
+              && test -f "$RUNNER_TEMP/valheim/valheim_server_Data/Managed/assembly_valheim.dll"; then
+              break
+            fi
+            [ "$attempt" = 3 ] && exit 1
+            sleep 5
+          done
+
+      - name: Decompile
+        run: |
+          set -o pipefail
+          dotnet tool install -g ilspycmd --version 8.2.0.7535
+          MANAGED="$RUNNER_TEMP/valheim/valheim_server_Data/Managed"
+          for t in $TYPES; do
+            echo "=================== $t ==================="
+            if [ -n "$GREP" ]; then
+              ilspycmd -r "$MANAGED" -t "$t" "$MANAGED/assembly_valheim.dll" | grep -n -E -A "$AFTER" "$GREP" || true
+            else
+              ilspycmd -r "$MANAGED" -t "$t" "$MANAGED/assembly_valheim.dll" | cat -n
+            fi
+          done

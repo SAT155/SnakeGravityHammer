@@ -1,0 +1,10 @@
+{
+  "name": "SnakeGravityHammer",
+  "author": "SAT",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/SAT155/SnakeGravityHammer",
+  "description": "Hold a key while building and the piece tilts and settles onto the ground or objects below it, like it was dropped there. No more hand-tilting logs on hillsides.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2350"
+  ]
+}
