@@ -8,8 +8,9 @@ onto the terrain or objects below it. Player-facing docs: `thunderstore/SnakeGra
 `SnakeGravityHammer/SnakeGravityHammerPlugin.cs` postfixes `Player.UpdatePlacementGhost`
 (`Priority.Last`, after Valheim Plus and SmartBuild). From the pose the game (or another mod) gave
 the ghost it keeps the position across the ground and the yaw, works out the ghost's base from its
-solid colliders (or meshes), casts a grid of rays down under the base, fits a plane through the
-hits (least squares), clamps its tilt, then lowers/raises the piece so it rests on the highest
+solid colliders (or meshes), casts a grid of rays down under the base, picks the lowest plane lying on
+top of every hit, measured under the base centre (where a rigid piece rests; *Fit: Average* uses a
+least-squares plane instead), clamps its tilt, then lowers/raises the piece so it rests on the highest
 point minus *Sink Depth*. Placing uses the ghost's transform, so the piece lands as previewed.
 
 ## Building

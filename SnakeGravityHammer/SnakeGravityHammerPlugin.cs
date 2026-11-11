@@ -7,6 +7,12 @@ using UnityEngine;
 
 namespace SnakeGravityHammer
 {
+    public enum FitMode
+    {
+        CenterOfMass,
+        Average
+    }
+
     public enum KeyMode
     {
         Hold,
@@ -18,7 +24,7 @@ namespace SnakeGravityHammer
     {
         public const string PluginGuid = "com.snakesquad.snakegravityhammer";
         public const string PluginName = "SnakeGravityHammer";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
 
         internal static SnakeGravityHammerPlugin? Instance;
 
@@ -29,6 +35,7 @@ namespace SnakeGravityHammer
         internal static ConfigEntry<float> MaxTilt = null!;
         internal static ConfigEntry<int> Samples = null!;
         internal static ConfigEntry<bool> RestOnPieces = null!;
+        internal static ConfigEntry<FitMode> Fit = null!;
         internal static ConfigEntry<bool> LogFit = null!;
 
         private static bool _toggledOn;
@@ -60,7 +67,12 @@ namespace SnakeGravityHammer
                 new ConfigDescription(
                     "How many points along each side of the piece's base are checked for ground (5 = a 5x5 " +
                     "grid). More fits uneven ground more closely.",
-                    new AcceptableValueRange<int>(2, 9)));
+                    new AcceptableValueRange<int>(2, 7)));
+            Fit = Config.Bind("2 - Settling", "Fit", FitMode.CenterOfMass,
+                "CenterOfMass: the piece settles the way a real object would, tipping over its middle until " +
+                "it rests on the ground points that hold it up (it can rock onto a bump rather than follow " +
+                "the average slope). Average: tilt to the average slope under the piece, then rest on the " +
+                "highest point.");
             RestOnPieces = Config.Bind("2 - Settling", "Rest On Pieces", true,
                 "Pieces can rest on other built pieces, not just terrain and rocks.");
 
@@ -254,9 +266,22 @@ namespace SnakeGravityHammer
             if (HitLocal.Count == 0)
                 return false;
 
-            // Least-squares plane y = a*x + c*z + d through the ground heights.
+            float maxTilt = SnakeGravityHammerPlugin.MaxTilt.Value;
+            float cx = b.center.x, cz = b.center.z;
+
+            // Center of mass: the lowest plane that lies on top of every ground point, measured
+            // under the piece's middle. That's where a rigid piece comes to rest (the upper hull
+            // facet under its center). Falls back to Average when no such plane is within Max Tilt.
             float a = 0f, c = 0f, d;
-            if (HitLocal.Count >= 3 && FitPlane(HitLocal, out var fa, out var fc, out var fd))
+            if (SnakeGravityHammerPlugin.Fit.Value == FitMode.CenterOfMass && HitLocal.Count >= 3
+                && RestingPlane(HitLocal, cx, cz, Mathf.Tan(maxTilt * Mathf.Deg2Rad), out var ra, out var rc, out var rd))
+            {
+                a = ra;
+                c = rc;
+                d = rd;
+            }
+            // Least-squares plane y = a*x + c*z + d through the ground heights.
+            else if (HitLocal.Count >= 3 && FitPlane(HitLocal, out var fa, out var fc, out var fd))
             {
                 a = fa;
                 c = fc;
@@ -272,7 +297,6 @@ namespace SnakeGravityHammer
             // Limit the tilt.
             var normal = new Vector3(-a, 1f, -c).normalized;
             float tilt = Vector3.Angle(Vector3.up, normal);
-            float maxTilt = SnakeGravityHammerPlugin.MaxTilt.Value;
             if (tilt > maxTilt && tilt > 0.01f)
             {
                 normal = Vector3.Slerp(Vector3.up, normal, maxTilt / tilt).normalized;
@@ -290,7 +314,6 @@ namespace SnakeGravityHammer
             rot = yaw * tiltRot;
 
             // Keep the centre of the base where it was across the ground, on the fitted plane.
-            float cx = b.center.x, cz = b.center.z;
             var baseCentre = new Vector3(cx, a * cx + c * cz + d, cz);
             var pivotLocal = baseCentre - tiltRot * new Vector3(cx, b.min.y, cz);
             pos = _basePos + yaw * pivotLocal;
@@ -342,6 +365,54 @@ namespace SnakeGravityHammer
                     point = hit.point;
                     found = true;
                 }
+            }
+            return found;
+        }
+
+        private static bool RestingPlane(List<Vector3> pts, float cx, float cz, float maxSlope,
+            out float a, out float c, out float d)
+        {
+            a = c = d = 0f;
+            const float eps = 0.002f;
+            float best = float.MaxValue;
+            bool found = false;
+            int m = pts.Count;
+            for (int i = 0; i < m - 2; i++)
+            for (int j = i + 1; j < m - 1; j++)
+            for (int k = j + 1; k < m; k++)
+            {
+                var p = pts[i];
+                var u = pts[j] - p;
+                var v = pts[k] - p;
+                // Plane normal (x, z components over y); skip near-vertical / collinear triples.
+                float det = u.x * v.z - u.z * v.x;
+                if (Mathf.Abs(det) < 0.02f)
+                    continue;
+                float pa = (u.y * v.z - u.z * v.y) / det;
+                float pc = (u.x * v.y - u.y * v.x) / det;
+                if (pa * pa + pc * pc > maxSlope * maxSlope)
+                    continue;
+                float pd = p.y - pa * p.x - pc * p.z;
+                float h = pa * cx + pc * cz + pd;
+                if (h >= best)
+                    continue;
+                bool ok = true;
+                for (int q = 0; q < m; q++)
+                {
+                    var r = pts[q];
+                    if (r.y > pa * r.x + pc * r.z + pd + eps)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (!ok)
+                    continue;
+                best = h;
+                a = pa;
+                c = pc;
+                d = pd;
+                found = true;
             }
             return found;
         }

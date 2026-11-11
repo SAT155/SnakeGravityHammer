@@ -5,7 +5,7 @@ hillside, a lumpy rock or a pile of other pieces, that leaves floating corners a
 halfway into the slope.
 
 With this mod, **hold Left Alt while placing with the hammer** and the preview drops onto what's
-underneath it: it **tilts forwards/backwards and sideways** to match the ground, other pieces or
+underneath it: it **tilts forwards/backwards and sideways**, balancing over its center of mass, to match the ground, other pieces or
 rocks below, and **settles down** until it rests on them. A small, configurable amount of sinking
 in hides the little gaps under a piece on uneven ground. Let go of the key for normal placement.
 
@@ -27,9 +27,10 @@ in hides the little gaps under a piece on uneven ground. Let go of the key for n
 | General / Enabled | `true` | Turns the whole mod on or off. |
 | General / Gravity Key | `LeftAlt` | The key for gravity placement. |
 | General / Key Mode | `Hold` | **Hold:** only while the key is held. **Toggle:** press once for on, again for off. |
+| Settling / Fit | `CenterOfMass` | **CenterOfMass:** the piece tips over its middle until it rests on the points that hold it up, like a real object (it can rock onto a bump instead of following the average slope). **Average:** tilt to the average slope underneath. |
 | Settling / Sink Depth | `0.1` | How far (metres) a piece may sink into the ground or objects to close gaps. 0 = rest exactly on the highest point. |
 | Settling / Max Tilt | `45` | Steepest tilt in degrees. |
-| Settling / Samples Per Side | `5` | Ground checks along each side of the piece's base (5 = 5x5). More fits rough ground more closely. |
+| Settling / Samples Per Side | `5` | Ground checks along each side of the piece's base (5 = 5x5, up to 7). More fits rough ground more closely. |
 | Settling / Rest On Pieces | `true` | Let pieces rest on other built pieces, not only terrain and rocks. |
 | Debug / Log Fit | `false` | Log the tilt and height each time you place with gravity placement. |
 
